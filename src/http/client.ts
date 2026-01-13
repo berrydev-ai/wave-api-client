@@ -1,14 +1,21 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { createErrorFromResponse } from '../common/errors';
 import { ApiErrorResponse, WaveApiConfig, HttpMethod } from '../common/types';
 import { CONTENT_TYPES, DEFAULT_BASE_URL, DEFAULT_TIMEOUT, HEADERS } from '../common/constants';
 
 /**
- * HTTP client for making API requests
+ * Request configuration options
+ */
+export interface RequestConfig {
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+/**
+ * HTTP client for making API requests using native fetch
  */
 export class HttpClient {
-  private client: AxiosInstance;
   private config: WaveApiConfig;
+  private baseHeaders: Record<string, string>;
 
   /**
    * Creates a new HTTP client instance
@@ -21,45 +28,57 @@ export class HttpClient {
       ...config,
     };
 
-    this.client = axios.create({
-      baseURL: this.config.baseUrl,
-      timeout: this.config.timeout,
-      headers: {
-        [HEADERS.CONTENT_TYPE]: CONTENT_TYPES.JSON,
-        [HEADERS.AUTHORIZATION]: `Bearer ${this.config.apiKey}`,
-      },
-    });
+    this.baseHeaders = {
+      [HEADERS.CONTENT_TYPE]: CONTENT_TYPES.JSON,
+      [HEADERS.AUTHORIZATION]: `Bearer ${this.config.apiKey}`,
+    };
+  }
 
-    // Add request interceptor for logging
+  /**
+   * Logs request details when debug mode is enabled
+   */
+  private logRequest(
+    method: string,
+    url: string,
+    headers: Record<string, string>,
+    data?: any,
+  ): void {
     if (this.config.debug) {
-      this.client.interceptors.request.use((request) => {
-        console.log('Request:', {
-          method: request.method?.toUpperCase(),
-          url: request.url,
-          headers: request.headers,
-          data: request.data,
-        });
-        return request;
+      console.log('Request:', {
+        method: method.toUpperCase(),
+        url,
+        headers,
+        data,
       });
+    }
+  }
 
-      // Add response interceptor for logging
-      this.client.interceptors.response.use(
-        (response) => {
-          console.log('Response:', {
-            status: response.status,
-            headers: response.headers,
-            data: response.data,
-          });
-          return response;
-        },
-        (error: AxiosError) => {
-          console.error('Error:', {
-            status: error.response?.status,
-            data: error.response?.data,
-          });
-          return Promise.reject(error);
-        },
-      );
+  /**
+   * Logs response details when debug mode is enabled
+   */
+  private logResponse(status: number, headers: Headers, data: any): void {
+    if (this.config.debug) {
+      const headersObj: Record<string, string> = {};
+      headers.forEach((value, key) => {
+        headersObj[key] = value;
+      });
+      console.log('Response:', {
+        status,
+        headers: headersObj,
+        data,
+      });
+    }
+  }
+
+  /**
+   * Logs error details when debug mode is enabled
+   */
+  private logError(status: number | undefined, data: any): void {
+    if (this.config.debug) {
+      console.error('Error:', {
+        status,
+        data,
+      });
     }
   }
 
@@ -70,44 +89,85 @@ export class HttpClient {
     method: HttpMethod,
     path: string,
     data?: any,
-    config?: Partial<AxiosRequestConfig>,
+    config?: Partial<RequestConfig>,
   ): Promise<T> {
-    try {
-      const response: AxiosResponse<T> = await this.client.request({
-        method,
-        url: path,
-        data: method === HttpMethod.POST ? data : undefined,
-        params: method === HttpMethod.GET ? data : undefined,
-        ...config,
-      });
+    const url = `${this.config.baseUrl}${path}`;
+    const headers = { ...this.baseHeaders, ...config?.headers };
 
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        const { status, data } = error.response;
-        throw createErrorFromResponse(status, data as ApiErrorResponse);
+    // Handle query params for GET requests
+    let finalUrl = url;
+    if (method === HttpMethod.GET && data) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      }
+      const queryString = params.toString();
+      if (queryString) {
+        finalUrl = `${url}?${queryString}`;
+      }
+    }
+
+    this.logRequest(method, finalUrl, headers, method === HttpMethod.POST ? data : undefined);
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const fetchOptions: RequestInit = {
+        method,
+        headers,
+        signal: config?.signal || controller.signal,
+      };
+
+      if (method === HttpMethod.POST && data) {
+        fetchOptions.body = JSON.stringify(data);
       }
 
-      // Re-throw other errors
+      const response = await fetch(finalUrl, fetchOptions);
+
+      // Parse response body
+      let responseData: any;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        responseData = await response.json();
+      } else {
+        const text = await response.text();
+        responseData = text ? text : undefined;
+      }
+
+      if (!response.ok) {
+        this.logError(response.status, responseData);
+        throw createErrorFromResponse(response.status, responseData as ApiErrorResponse);
+      }
+
+      this.logResponse(response.status, response.headers, responseData);
+      return responseData as T;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${this.config.timeout}ms`);
+      }
+
+      // Re-throw API errors
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
   /**
    * Makes a GET request
    */
-  get<T>(
-    path: string,
-    params?: Record<string, any>,
-    config?: Partial<AxiosRequestConfig>,
-  ): Promise<T> {
+  get<T>(path: string, params?: Record<string, any>, config?: Partial<RequestConfig>): Promise<T> {
     return this.request<T>(HttpMethod.GET, path, params, config);
   }
 
   /**
    * Makes a POST request
    */
-  post<T>(path: string, data?: any, config?: Partial<AxiosRequestConfig>): Promise<T> {
+  post<T>(path: string, data?: any, config?: Partial<RequestConfig>): Promise<T> {
     return this.request<T>(HttpMethod.POST, path, data, config);
   }
 }

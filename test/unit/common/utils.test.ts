@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import { isEmpty, isValidApiKey, formatAmount, createQueryString } from '../../../src/common/utils';
 
 describe('Utils', () => {

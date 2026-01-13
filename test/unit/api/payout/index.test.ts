@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { PayoutApi } from '../../../../src/api/payout';
 import { HttpClient } from '../../../../src/http/client';
 import { ENDPOINTS, HEADERS } from '../../../../src/common/constants';
@@ -9,22 +10,23 @@ import {
   PayoutStatus,
   PayoutBatchStatus,
 } from '../../../../src/api/payout/types';
-import * as utils from '../../../../src/common/utils';
-
-// Mock HttpClient and formatAmount utility
-jest.mock('../../../../src/http/client');
-jest.mock('../../../../src/common/utils', () => ({
-  formatAmount: jest.fn().mockReturnValue('1000.00'),
-}));
 
 describe('PayoutApi', () => {
-  let httpClient: jest.Mocked<HttpClient>;
+  let httpClient: HttpClient;
   let payoutApi: PayoutApi;
+  let getMock: ReturnType<typeof mock>;
+  let postMock: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    httpClient = new HttpClient({ apiKey: 'test_key' }) as jest.Mocked<HttpClient>;
+    getMock = mock(() => Promise.resolve({}));
+    postMock = mock(() => Promise.resolve({}));
+
+    httpClient = {
+      get: getMock,
+      post: postMock,
+    } as unknown as HttpClient;
+
     payoutApi = new PayoutApi(httpClient);
-    jest.clearAllMocks();
   });
 
   describe('createPayout', () => {
@@ -40,7 +42,7 @@ describe('PayoutApi', () => {
       const mockResponse: Payout = {
         id: 'payout-123',
         currency: 'XOF',
-        receive_amount: '1000.00',
+        receive_amount: '1000',
         fee: '10.00',
         mobile: '+221123456789',
         name: 'John Doe',
@@ -49,16 +51,15 @@ describe('PayoutApi', () => {
         timestamp: '2023-05-15T10:00:00Z',
       };
 
-      httpClient.post.mockResolvedValueOnce(mockResponse);
+      postMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const idempotencyKey = 'idem-key-123';
       const result = await payoutApi.createPayout(mockRequest, idempotencyKey);
 
-      expect(utils.formatAmount).toHaveBeenCalledWith(1000, 'XOF');
-      expect(httpClient.post).toHaveBeenCalledWith(
+      expect(postMock).toHaveBeenCalledWith(
         ENDPOINTS.PAYOUT,
         {
-          receive_amount: '1000.00',
+          receive_amount: '1000',
           currency: 'XOF',
           mobile: '+221123456789',
           name: 'John Doe',
@@ -119,7 +120,7 @@ describe('PayoutApi', () => {
         ),
       ).rejects.toThrow('idempotencyKey is required');
 
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 
@@ -149,7 +150,7 @@ describe('PayoutApi', () => {
           {
             id: 'payout-123',
             currency: 'XOF',
-            receive_amount: '1000.00',
+            receive_amount: '1000',
             fee: '10.00',
             mobile: '+221123456789',
             name: 'John Doe',
@@ -159,7 +160,7 @@ describe('PayoutApi', () => {
           {
             id: 'payout-124',
             currency: 'XOF',
-            receive_amount: '2000.00',
+            receive_amount: '2000',
             fee: '20.00',
             mobile: '+221987654321',
             name: 'Jane Doe',
@@ -169,27 +170,23 @@ describe('PayoutApi', () => {
         ],
       };
 
-      httpClient.post.mockResolvedValueOnce(mockResponse);
+      postMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const idempotencyKey = 'batch-idem-key-123';
       const result = await payoutApi.createPayoutBatch(mockRequest, idempotencyKey);
 
-      expect(utils.formatAmount).toHaveBeenCalledTimes(2);
-      expect(utils.formatAmount).toHaveBeenNthCalledWith(1, 1000, 'XOF');
-      expect(utils.formatAmount).toHaveBeenNthCalledWith(2, 2000, 'XOF');
-
-      expect(httpClient.post).toHaveBeenCalledWith(
+      expect(postMock).toHaveBeenCalledWith(
         ENDPOINTS.PAYOUT_BATCH,
         {
           payouts: [
             {
-              receive_amount: '1000.00',
+              receive_amount: '1000',
               currency: 'XOF',
               mobile: '+221123456789',
               name: 'John Doe',
             },
             {
-              receive_amount: '1000.00', // This is mocked to return 1000.00 for all calls
+              receive_amount: '2000',
               currency: 'XOF',
               mobile: '+221987654321',
               name: 'Jane Doe',
@@ -240,7 +237,7 @@ describe('PayoutApi', () => {
         ),
       ).rejects.toThrow('idempotencyKey is required');
 
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 
@@ -257,17 +254,17 @@ describe('PayoutApi', () => {
         timestamp: '2023-05-15T10:00:00Z',
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await payoutApi.getPayout('payout-123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(`${ENDPOINTS.PAYOUT}/payout-123`);
+      expect(getMock).toHaveBeenCalledWith(`${ENDPOINTS.PAYOUT}/payout-123`);
       expect(result).toEqual(mockResponse);
     });
 
     it('should throw error when payout ID is not provided', async () => {
       await expect(payoutApi.getPayout('')).rejects.toThrow('payoutId is required');
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 
@@ -289,17 +286,17 @@ describe('PayoutApi', () => {
         ],
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await payoutApi.getPayoutBatch('batch-123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(`${ENDPOINTS.PAYOUT_BATCH}/batch-123`);
+      expect(getMock).toHaveBeenCalledWith(`${ENDPOINTS.PAYOUT_BATCH}/batch-123`);
       expect(result).toEqual(mockResponse);
     });
 
     it('should throw error when batch ID is not provided', async () => {
       await expect(payoutApi.getPayoutBatch('')).rejects.toThrow('batchId is required');
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 
@@ -320,11 +317,11 @@ describe('PayoutApi', () => {
         ],
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await payoutApi.searchPayouts('ref-123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(
+      expect(getMock).toHaveBeenCalledWith(
         `${ENDPOINTS.PAYOUTS_SEARCH}?client_reference=ref-123`,
       );
       expect(result).toEqual(mockResponse);
@@ -332,22 +329,22 @@ describe('PayoutApi', () => {
 
     it('should throw error when client reference is not provided', async () => {
       await expect(payoutApi.searchPayouts('')).rejects.toThrow('clientReference is required');
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 
   describe('reversePayout', () => {
     it('should reverse a payout', async () => {
-      httpClient.post.mockResolvedValueOnce(undefined);
+      postMock.mockImplementation(() => Promise.resolve(undefined));
 
       await payoutApi.reversePayout('payout-123');
 
-      expect(httpClient.post).toHaveBeenCalledWith(`${ENDPOINTS.PAYOUT}/payout-123/reverse`);
+      expect(postMock).toHaveBeenCalledWith(`${ENDPOINTS.PAYOUT}/payout-123/reverse`);
     });
 
     it('should throw error when payout ID is not provided', async () => {
       await expect(payoutApi.reversePayout('')).rejects.toThrow('payoutId is required');
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 });

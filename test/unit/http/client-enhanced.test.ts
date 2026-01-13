@@ -1,5 +1,4 @@
-// This is an empty test file that simply checks that the enhanced client tests pass
-// You can replace with more detailed tests if needed
+import { describe, it, expect } from 'bun:test';
 
 describe('HttpClient Enhanced Tests', () => {
   it('should be tested elsewhere', () => {
