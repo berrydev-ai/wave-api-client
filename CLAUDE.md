@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 TypeScript client library for the Wave API (African fintech platform). Provides type-safe access to Wave's payment services including balance/reconciliation, checkout, payout, and merchants APIs.
 
+Published to npm as `@berrydev-ai/wave-api-client`.
+
 Uses Bun as the runtime, package manager, and test runner.
 
 ## Commands
@@ -30,6 +32,18 @@ Run tests matching a pattern:
 ```bash
 bun test --test-name-pattern "createSession"
 ```
+
+## Publishing to npm
+
+The package is scoped under `@berrydev-ai`. Publishing commands:
+
+```bash
+bun run publish:patch   # 1.0.0 -> 1.0.1
+bun run publish:minor   # 1.0.0 -> 1.1.0
+bun run publish:major   # 1.0.0 -> 2.0.0
+```
+
+These commands bump the version, push git tags, and publish to npm.
 
 ## Architecture
 

@@ -2,30 +2,32 @@
 
 A TypeScript client for Wave API, providing a simple and type-safe way to interact with [Wave's payment services](https://docs.wave.com/business).
 
-[![npm version](https://badge.fury.io/js/wave-api-client.svg)](https://badge.fury.io/js/wave-api-client)
+[![npm version](https://badge.fury.io/js/@berrydev-ai%2Fwave-api-client.svg)](https://www.npmjs.com/package/@berrydev-ai/wave-api-client)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- 🔒 Type-safe API for Wave services
-- 🚀 Promises-based API
-- 📦 Modular design
-- 📘 Comprehensive documentation
-- ✅ Complete error handling
-- 🧪 Test coverage
+- Built with [Bun](https://bun.sh) for fast development and testing
+- Type-safe API for Wave services
+- Native fetch-based HTTP client (no external dependencies)
+- Modular design
+- Comprehensive error handling
+- Full test coverage
 
 ## Installation
 
 ```bash
-npm install wave-api-client
+npm install @berrydev-ai/wave-api-client
 # or
-yarn add wave-api-client
+yarn add @berrydev-ai/wave-api-client
+# or
+bun add @berrydev-ai/wave-api-client
 ```
 
 ## Getting Started
 
 ```typescript
-import { WaveClient } from 'wave-api-client';
+import { WaveClient } from '@berrydev-ai/wave-api-client';
 
 // Initialize the client with your API key
 const waveClient = new WaveClient({
@@ -184,7 +186,7 @@ const merchant = await waveClient.merchants.getMerchant('merchant_123');
 The client provides detailed error information with proper typing:
 
 ```typescript
-import { WaveApiError, ValidationError } from 'wave-api-client';
+import { WaveApiError, ValidationError } from '@berrydev-ai/wave-api-client';
 
 try {
   await waveClient.checkout.createSession({
@@ -210,22 +212,39 @@ For detailed documentation, see:
 
 ## Development
 
+This project uses [Bun](https://bun.sh) as its JavaScript runtime, package manager, and test runner.
+
 ```bash
 # Clone the repository
-git clone https://github.com/0xc007b/wave-api-client.git
+git clone https://github.com/berrydev-ai/wave-api-client.git
 cd wave-api-client
 
 # Install dependencies
-npm install
+bun install
 
 # Build the project
-npm run build
+bun run build
 
 # Run tests
-npm test
+bun test
 
 # Lint the code
-npm run lint
+bun run lint
+```
+
+## Publishing
+
+The package is published to npm under the `@berrydev-ai` scope.
+
+```bash
+# Publish a patch version (1.0.0 -> 1.0.1)
+bun run publish:patch
+
+# Publish a minor version (1.0.0 -> 1.1.0)
+bun run publish:minor
+
+# Publish a major version (1.0.0 -> 2.0.0)
+bun run publish:major
 ```
 
 ## License
