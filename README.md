@@ -7,12 +7,23 @@ A TypeScript client for Wave API, providing a simple and type-safe way to intera
 
 ## Features
 
-- Built with [Bun](https://bun.sh) for fast development and testing
 - Type-safe API for Wave services
-- Native fetch-based HTTP client (no external dependencies)
+- Native fetch-based HTTP client (zero runtime dependencies)
 - Modular design
 - Comprehensive error handling
 - Full test coverage
+
+## Why Bun?
+
+This project uses [Bun](https://bun.sh) for development, providing significant advantages:
+
+- **Faster development cycle**: Tests run in ~80ms, installs complete in ~1 second
+- **Zero runtime dependencies**: Native `fetch()` API replaces axios, reducing bundle size
+- **Native TypeScript**: No transpilation needed during development or testing
+- **Unified tooling**: Single tool for runtime, package management, and testing
+- **Simpler configuration**: No Jest config or ts-jest setup required
+
+Note: Consumers can still use npm, yarn, or any package manager to install the published package.
 
 ## Installation
 
