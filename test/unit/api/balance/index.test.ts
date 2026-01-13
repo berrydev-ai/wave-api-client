@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock, spyOn } from 'bun:test';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { BalanceApi } from '../../../../src/api/balance';
 import { HttpClient } from '../../../../src/http/client';
 import { ENDPOINTS } from '../../../../src/common/constants';

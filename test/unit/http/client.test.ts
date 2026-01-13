@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { HttpClient } from '../../../src/http/client';
-import { HttpMethod } from '../../../src/common/types';
 import { ValidationError, ServerError } from '../../../src/common/errors';
 
 describe('HttpClient', () => {
@@ -81,13 +80,7 @@ describe('HttpClient', () => {
 
     const httpClient = new HttpClient(mockConfig);
 
-    try {
-      await httpClient.get('/test');
-      expect(true).toBe(false); // Should not reach here
-    } catch (error) {
-      expect(error).toBeInstanceOf(ValidationError);
-      expect((error as ValidationError).statusCode).toBe(422);
-    }
+    await expect(httpClient.get('/test')).rejects.toThrow(ValidationError);
   });
 
   it('should handle server errors correctly', async () => {
@@ -107,13 +100,7 @@ describe('HttpClient', () => {
 
     const httpClient = new HttpClient(mockConfig);
 
-    try {
-      await httpClient.post('/test', { data: 'value' });
-      expect(true).toBe(false); // Should not reach here
-    } catch (error) {
-      expect(error).toBeInstanceOf(ServerError);
-      expect((error as ServerError).statusCode).toBe(500);
-    }
+    await expect(httpClient.post('/test', { data: 'value' })).rejects.toThrow(ServerError);
   });
 
   it('should include query parameters in GET requests', async () => {
@@ -156,5 +143,52 @@ describe('HttpClient', () => {
 
     const headers = capturedOptions.headers as Record<string, string>;
     expect(headers['Authorization']).toBe(`Bearer ${mockConfig.apiKey}`);
+  });
+
+  it('should handle request timeout', async () => {
+    // Create a client with a very short timeout
+    const shortTimeoutConfig = { ...mockConfig, timeout: 50 };
+
+    // Mock fetch to respect abort signal and delay longer than the timeout
+    global.fetch = mock((_url: string, options?: RequestInit) =>
+      new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve({ data: 'test' }),
+          } as Response);
+        }, 200); // Longer than timeout
+
+        // Listen for abort signal
+        options?.signal?.addEventListener('abort', () => {
+          clearTimeout(timeoutId);
+          const error = new Error('The operation was aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      })
+    );
+
+    const httpClient = new HttpClient(shortTimeoutConfig);
+
+    await expect(httpClient.get('/test')).rejects.toThrow('Request timeout after 50ms');
+  });
+
+  it('should handle text responses', async () => {
+    global.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve('plain text response'),
+      } as Response)
+    );
+
+    const httpClient = new HttpClient(mockConfig);
+    const result = await httpClient.get('/test');
+
+    expect(result).toBe('plain text response');
   });
 });

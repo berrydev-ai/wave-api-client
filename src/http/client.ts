@@ -127,7 +127,6 @@ export class HttpClient {
       }
 
       const response = await fetch(finalUrl, fetchOptions);
-      clearTimeout(timeoutId);
 
       // Parse response body
       let responseData: any;
@@ -147,14 +146,14 @@ export class HttpClient {
       this.logResponse(response.status, response.headers, responseData);
       return responseData as T;
     } catch (error) {
-      clearTimeout(timeoutId);
-
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(`Request timeout after ${this.config.timeout}ms`);
       }
 
       // Re-throw API errors
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

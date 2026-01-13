@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/berrydev-ai/wave-api-client",
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "^1.1.0",
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.57.1",
     "@typescript-eslint/parser": "^5.57.1",
@@ -55,6 +55,7 @@
     "typescript": "^5.0.4"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
   }
 }
