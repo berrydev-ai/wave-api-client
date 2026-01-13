@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import {
   WaveApiError,
   AuthenticationError,
@@ -41,12 +42,6 @@ describe('Errors', () => {
   });
 
   describe('Specific error types', () => {
-    const testErrorResponse: ApiErrorResponse = {
-      code: 'test-error',
-      message: 'Test error message',
-      details: [{ loc: ['body', 'field'], msg: 'Field error' }],
-    };
-
     it('should create AuthenticationError with correct status code', () => {
       const error = new AuthenticationError('Auth error', 'auth-error', { detail: 'info' });
 

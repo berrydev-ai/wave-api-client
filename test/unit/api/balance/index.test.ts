@@ -1,19 +1,26 @@
+import { describe, it, expect, beforeEach, mock, spyOn } from 'bun:test';
 import { BalanceApi } from '../../../../src/api/balance';
 import { HttpClient } from '../../../../src/http/client';
 import { ENDPOINTS } from '../../../../src/common/constants';
 import { Balance, TransactionListResponse } from '../../../../src/api/balance/types';
 
-// Mock HttpClient
-jest.mock('../../../../src/http/client');
-
 describe('BalanceApi', () => {
-  let httpClient: jest.Mocked<HttpClient>;
+  let httpClient: HttpClient;
   let balanceApi: BalanceApi;
+  let getMock: ReturnType<typeof mock>;
+  let postMock: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    httpClient = new HttpClient({ apiKey: 'test_key' }) as jest.Mocked<HttpClient>;
+    // Create a mock HttpClient with mocked methods
+    getMock = mock(() => Promise.resolve({}));
+    postMock = mock(() => Promise.resolve({}));
+
+    httpClient = {
+      get: getMock,
+      post: postMock,
+    } as unknown as HttpClient;
+
     balanceApi = new BalanceApi(httpClient);
-    jest.clearAllMocks();
   });
 
   describe('getBalance', () => {
@@ -23,11 +30,11 @@ describe('BalanceApi', () => {
         currency: 'XOF',
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await balanceApi.getBalance();
 
-      expect(httpClient.get).toHaveBeenCalledWith(ENDPOINTS.BALANCE);
+      expect(getMock).toHaveBeenCalledWith(ENDPOINTS.BALANCE);
       expect(result).toEqual(mockResponse);
     });
 
@@ -37,11 +44,11 @@ describe('BalanceApi', () => {
         currency: 'GHS',
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await balanceApi.getBalance({ include_subaccounts: true });
 
-      expect(httpClient.get).toHaveBeenCalledWith(`${ENDPOINTS.BALANCE}?include_subaccounts=true`);
+      expect(getMock).toHaveBeenCalledWith(`${ENDPOINTS.BALANCE}?include_subaccounts=true`);
       expect(result).toEqual(mockResponse);
     });
   });
@@ -66,11 +73,11 @@ describe('BalanceApi', () => {
         ],
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await balanceApi.listTransactions();
 
-      expect(httpClient.get).toHaveBeenCalledWith(ENDPOINTS.TRANSACTIONS);
+      expect(getMock).toHaveBeenCalledWith(ENDPOINTS.TRANSACTIONS);
       expect(result).toEqual(mockResponse);
     });
 
@@ -93,7 +100,7 @@ describe('BalanceApi', () => {
         ],
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const params = {
         date: '2023-05-14',
@@ -103,7 +110,7 @@ describe('BalanceApi', () => {
 
       const result = await balanceApi.listTransactions(params);
 
-      expect(httpClient.get).toHaveBeenCalledWith(
+      expect(getMock).toHaveBeenCalledWith(
         `${ENDPOINTS.TRANSACTIONS}?date=2023-05-14&after=prev-cursor&include_subaccounts=true`,
       );
       expect(result).toEqual(mockResponse);
@@ -114,11 +121,11 @@ describe('BalanceApi', () => {
     it('should refund a transaction successfully', async () => {
       const transactionId = 'tx789';
 
-      httpClient.post.mockResolvedValueOnce(undefined);
+      postMock.mockImplementation(() => Promise.resolve(undefined));
 
       await balanceApi.refundTransaction(transactionId);
 
-      expect(httpClient.post).toHaveBeenCalledWith(
+      expect(postMock).toHaveBeenCalledWith(
         `${ENDPOINTS.TRANSACTIONS}/${transactionId}/refund`,
         {},
       );
@@ -126,7 +133,7 @@ describe('BalanceApi', () => {
 
     it('should throw error when transaction ID is not provided', async () => {
       await expect(balanceApi.refundTransaction('')).rejects.toThrow('transactionId is required');
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 });

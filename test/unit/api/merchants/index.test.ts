@@ -1,19 +1,23 @@
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { MerchantsApi } from '../../../../src/api/merchants';
 import { HttpClient } from '../../../../src/http/client';
 import { ENDPOINTS } from '../../../../src/common/constants';
 import { MerchantDetails, MerchantStatus } from '../../../../src/api/merchants/types';
 
-// Mock HttpClient
-jest.mock('../../../../src/http/client');
-
 describe('MerchantsApi', () => {
-  let httpClient: jest.Mocked<HttpClient>;
+  let httpClient: HttpClient;
   let merchantsApi: MerchantsApi;
+  let getMock: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    httpClient = new HttpClient({ apiKey: 'test_key' }) as jest.Mocked<HttpClient>;
+    getMock = mock(() => Promise.resolve({}));
+
+    httpClient = {
+      get: getMock,
+      post: mock(() => Promise.resolve({})),
+    } as unknown as HttpClient;
+
     merchantsApi = new MerchantsApi(httpClient);
-    jest.clearAllMocks();
   });
 
   describe('listMerchants', () => {
@@ -31,11 +35,11 @@ describe('MerchantsApi', () => {
         has_more: false,
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await merchantsApi.listMerchants();
 
-      expect(httpClient.get).toHaveBeenCalledWith(ENDPOINTS.AGGREGATED_MERCHANTS);
+      expect(getMock).toHaveBeenCalledWith(ENDPOINTS.AGGREGATED_MERCHANTS);
       expect(result).toEqual(mockResponse);
     });
 
@@ -54,7 +58,7 @@ describe('MerchantsApi', () => {
         has_more: true,
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const params = {
         status: MerchantStatus.ACTIVE,
@@ -65,7 +69,7 @@ describe('MerchantsApi', () => {
 
       const result = await merchantsApi.listMerchants(params);
 
-      expect(httpClient.get).toHaveBeenCalledWith(
+      expect(getMock).toHaveBeenCalledWith(
         `${ENDPOINTS.AGGREGATED_MERCHANTS}?status=active&search=test&first=10&after=cursor-123`,
       );
       expect(result).toEqual(mockResponse);
@@ -82,11 +86,11 @@ describe('MerchantsApi', () => {
         updated_at: '2023-05-15T10:00:00Z',
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await merchantsApi.getMerchant('merchant-123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(
+      expect(getMock).toHaveBeenCalledWith(
         `${ENDPOINTS.AGGREGATED_MERCHANTS}/merchant-123`,
       );
       expect(result).toEqual(mockResponse);
@@ -94,7 +98,7 @@ describe('MerchantsApi', () => {
 
     it('should throw error when merchant ID is not provided', async () => {
       await expect(merchantsApi.getMerchant('')).rejects.toThrow('merchantId is required');
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 });

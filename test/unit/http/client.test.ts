@@ -1,10 +1,7 @@
-// HTTP Client Tests
-import axios from 'axios';
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
 import { HttpClient } from '../../../src/http/client';
-import { CONTENT_TYPES, HEADERS } from '../../../src/common/constants';
-
-// Mock axios
-jest.mock('axios');
+import { HttpMethod } from '../../../src/common/types';
+import { ValidationError, ServerError } from '../../../src/common/errors';
 
 describe('HttpClient', () => {
   const mockConfig = {
@@ -14,54 +11,150 @@ describe('HttpClient', () => {
     debug: false,
   };
 
+  let originalFetch: typeof global.fetch;
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    // Set up mocked axios
-    (axios.create as jest.Mock).mockReturnValue({
-      request: jest.fn().mockResolvedValue({ data: {} }),
-      interceptors: {
-        request: { use: jest.fn() },
-        response: { use: jest.fn() },
-      },
-    });
+    originalFetch = global.fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   it('should initialize with correct configuration', () => {
     const httpClient = new HttpClient(mockConfig);
-    
-    expect(axios.create).toHaveBeenCalledWith({
-      baseURL: mockConfig.baseUrl,
-      timeout: mockConfig.timeout,
-      headers: {
-        [HEADERS.CONTENT_TYPE]: CONTENT_TYPES.JSON,
-        [HEADERS.AUTHORIZATION]: `Bearer ${mockConfig.apiKey}`,
-      },
-    });
+    expect(httpClient).toBeDefined();
   });
-  
+
   it('should make GET requests correctly', async () => {
+    const mockResponse = { id: '123', name: 'Test' };
+
+    global.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(mockResponse),
+      } as Response)
+    );
+
     const httpClient = new HttpClient(mockConfig);
-    const axiosInstance = axios.create();
-    
-    const mockResponse = { data: { id: '123', name: 'Test' } };
-    (axiosInstance.request as jest.Mock).mockResolvedValueOnce(mockResponse);
-    
     const result = await httpClient.get('/test', { param: 'value' });
-    
-    expect(axiosInstance.request).toHaveBeenCalled();
-    expect(result).toBe(mockResponse.data);
+
+    expect(result).toEqual(mockResponse);
+    expect(global.fetch).toHaveBeenCalled();
   });
-  
+
   it('should make POST requests correctly', async () => {
+    const mockResponse = { success: true };
+
+    global.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(mockResponse),
+      } as Response)
+    );
+
     const httpClient = new HttpClient(mockConfig);
-    const axiosInstance = axios.create();
-    
-    const mockResponse = { data: { success: true } };
-    (axiosInstance.request as jest.Mock).mockResolvedValueOnce(mockResponse);
-    
     const result = await httpClient.post('/test', { name: 'Test' });
-    
-    expect(axiosInstance.request).toHaveBeenCalled();
-    expect(result).toBe(mockResponse.data);
+
+    expect(result).toEqual(mockResponse);
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
+  it('should handle API errors correctly', async () => {
+    const errorResponse = {
+      code: 'request-validation-error',
+      message: 'Validation failed',
+    };
+
+    global.fetch = mock(() =>
+      Promise.resolve({
+        ok: false,
+        status: 422,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(errorResponse),
+      } as Response)
+    );
+
+    const httpClient = new HttpClient(mockConfig);
+
+    try {
+      await httpClient.get('/test');
+      expect(true).toBe(false); // Should not reach here
+    } catch (error) {
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as ValidationError).statusCode).toBe(422);
+    }
+  });
+
+  it('should handle server errors correctly', async () => {
+    const errorResponse = {
+      code: 'internal-server-error',
+      message: 'Server error',
+    };
+
+    global.fetch = mock(() =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(errorResponse),
+      } as Response)
+    );
+
+    const httpClient = new HttpClient(mockConfig);
+
+    try {
+      await httpClient.post('/test', { data: 'value' });
+      expect(true).toBe(false); // Should not reach here
+    } catch (error) {
+      expect(error).toBeInstanceOf(ServerError);
+      expect((error as ServerError).statusCode).toBe(500);
+    }
+  });
+
+  it('should include query parameters in GET requests', async () => {
+    const mockResponse = { data: 'test' };
+    let capturedUrl = '';
+
+    global.fetch = mock((url: string) => {
+      capturedUrl = url;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
+    });
+
+    const httpClient = new HttpClient(mockConfig);
+    await httpClient.get('/test', { foo: 'bar', baz: 123 });
+
+    expect(capturedUrl).toContain('foo=bar');
+    expect(capturedUrl).toContain('baz=123');
+  });
+
+  it('should include authorization header in requests', async () => {
+    const mockResponse = { data: 'test' };
+    let capturedOptions: RequestInit = {};
+
+    global.fetch = mock((_url: string, options?: RequestInit) => {
+      capturedOptions = options || {};
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(mockResponse),
+      } as Response);
+    });
+
+    const httpClient = new HttpClient(mockConfig);
+    await httpClient.get('/test');
+
+    const headers = capturedOptions.headers as Record<string, string>;
+    expect(headers['Authorization']).toBe(`Bearer ${mockConfig.apiKey}`);
   });
 });

@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import {
   Balance,
   BalanceParams,
@@ -184,20 +185,20 @@ describe('Balance API Types', () => {
   describe('Type compatibility with Currency', () => {
     it('should ensure Balance uses the common Currency type', () => {
       const currencies: Currency[] = ['XOF', 'GHS', 'SLL', 'USD'];
-      
+
       currencies.forEach(currency => {
         const balance: Balance = {
           amount: '1000.00',
           currency,
         };
-        
+
         expect(balance.currency).toBe(currency);
       });
     });
 
     it('should ensure TransactionItem uses the common Currency type', () => {
       const currencies: Currency[] = ['XOF', 'GHS', 'SLL', 'USD'];
-      
+
       currencies.forEach(currency => {
         const transaction: TransactionItem = {
           timestamp: '2023-05-15T10:00:00Z',
@@ -206,7 +207,7 @@ describe('Balance API Types', () => {
           fee: '1.50',
           currency,
         };
-        
+
         expect(transaction.currency).toBe(currency);
       });
     });

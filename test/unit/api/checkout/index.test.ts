@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { CheckoutApi } from '../../../../src/api/checkout';
 import { HttpClient } from '../../../../src/http/client';
 import { ENDPOINTS } from '../../../../src/common/constants';
@@ -7,22 +8,23 @@ import {
   CheckoutSessionStatus,
   PaymentStatus,
 } from '../../../../src/api/checkout/types';
-import * as utils from '../../../../src/common/utils';
-
-// Mock HttpClient and formatAmount utility
-jest.mock('../../../../src/http/client');
-jest.mock('../../../../src/common/utils', () => ({
-  formatAmount: jest.fn().mockReturnValue('1000.00'),
-}));
 
 describe('CheckoutApi', () => {
-  let httpClient: jest.Mocked<HttpClient>;
+  let httpClient: HttpClient;
   let checkoutApi: CheckoutApi;
+  let getMock: ReturnType<typeof mock>;
+  let postMock: ReturnType<typeof mock>;
 
   beforeEach(() => {
-    httpClient = new HttpClient({ apiKey: 'test_key' }) as jest.Mocked<HttpClient>;
+    getMock = mock(() => Promise.resolve({}));
+    postMock = mock(() => Promise.resolve({}));
+
+    httpClient = {
+      get: getMock,
+      post: postMock,
+    } as unknown as HttpClient;
+
     checkoutApi = new CheckoutApi(httpClient);
-    jest.clearAllMocks();
   });
 
   describe('createSession', () => {
@@ -37,7 +39,7 @@ describe('CheckoutApi', () => {
 
       const mockResponse: CheckoutSession = {
         id: 'sess_123',
-        amount: '1000.00',
+        amount: '1000',
         checkout_status: CheckoutSessionStatus.OPEN,
         currency: 'XOF',
         error_url: 'https://example.com/error',
@@ -50,13 +52,12 @@ describe('CheckoutApi', () => {
         client_reference: 'ref123',
       };
 
-      httpClient.post.mockResolvedValueOnce(mockResponse);
+      postMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await checkoutApi.createSession(mockRequest);
 
-      expect(utils.formatAmount).toHaveBeenCalledWith(1000, 'XOF');
-      expect(httpClient.post).toHaveBeenCalledWith(ENDPOINTS.CHECKOUT_SESSIONS, {
-        amount: '1000.00',
+      expect(postMock).toHaveBeenCalledWith(ENDPOINTS.CHECKOUT_SESSIONS, {
+        amount: '1000',
         currency: 'XOF',
         success_url: 'https://example.com/success',
         error_url: 'https://example.com/error',
@@ -114,7 +115,7 @@ describe('CheckoutApi', () => {
         'error_url is required',
       );
 
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 
@@ -136,17 +137,17 @@ describe('CheckoutApi', () => {
         when_expires: '2023-05-15T11:00:00Z',
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await checkoutApi.getSession('sess_123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(`${ENDPOINTS.CHECKOUT_SESSIONS}/sess_123`);
+      expect(getMock).toHaveBeenCalledWith(`${ENDPOINTS.CHECKOUT_SESSIONS}/sess_123`);
       expect(result).toEqual(mockResponse);
     });
 
     it('should throw error when session ID is not provided', async () => {
       await expect(checkoutApi.getSession('')).rejects.toThrow('sessionId is required');
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 
@@ -168,11 +169,11 @@ describe('CheckoutApi', () => {
         when_expires: '2023-05-15T11:00:00Z',
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await checkoutApi.getSessionByTransactionId('tx_123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(
+      expect(getMock).toHaveBeenCalledWith(
         `${ENDPOINTS.CHECKOUT_SESSIONS}?transaction_id=tx_123`,
       );
       expect(result).toEqual(mockResponse);
@@ -182,7 +183,7 @@ describe('CheckoutApi', () => {
       await expect(checkoutApi.getSessionByTransactionId('')).rejects.toThrow(
         'transactionId is required',
       );
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 
@@ -209,11 +210,11 @@ describe('CheckoutApi', () => {
         ],
       };
 
-      httpClient.get.mockResolvedValueOnce(mockResponse);
+      getMock.mockImplementation(() => Promise.resolve(mockResponse));
 
       const result = await checkoutApi.searchSessions('ref123');
 
-      expect(httpClient.get).toHaveBeenCalledWith(
+      expect(getMock).toHaveBeenCalledWith(
         `${ENDPOINTS.CHECKOUT_SESSIONS}/search?client_reference=ref123`,
       );
       expect(result).toEqual(mockResponse);
@@ -221,41 +222,41 @@ describe('CheckoutApi', () => {
 
     it('should throw error when client reference is not provided', async () => {
       await expect(checkoutApi.searchSessions('')).rejects.toThrow('clientReference is required');
-      expect(httpClient.get).not.toHaveBeenCalled();
+      expect(getMock).not.toHaveBeenCalled();
     });
   });
 
   describe('refundSession', () => {
     it('should refund a checkout session', async () => {
-      httpClient.post.mockResolvedValueOnce(undefined);
+      postMock.mockImplementation(() => Promise.resolve(undefined));
 
       await checkoutApi.refundSession('sess_123');
 
-      expect(httpClient.post).toHaveBeenCalledWith(
+      expect(postMock).toHaveBeenCalledWith(
         `${ENDPOINTS.CHECKOUT_SESSIONS}/sess_123/refund`,
       );
     });
 
     it('should throw error when session ID is not provided', async () => {
       await expect(checkoutApi.refundSession('')).rejects.toThrow('sessionId is required');
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 
   describe('expireSession', () => {
     it('should expire a checkout session', async () => {
-      httpClient.post.mockResolvedValueOnce(undefined);
+      postMock.mockImplementation(() => Promise.resolve(undefined));
 
       await checkoutApi.expireSession('sess_123');
 
-      expect(httpClient.post).toHaveBeenCalledWith(
+      expect(postMock).toHaveBeenCalledWith(
         `${ENDPOINTS.CHECKOUT_SESSIONS}/sess_123/expire`,
       );
     });
 
     it('should throw error when session ID is not provided', async () => {
       await expect(checkoutApi.expireSession('')).rejects.toThrow('sessionId is required');
-      expect(httpClient.post).not.toHaveBeenCalled();
+      expect(postMock).not.toHaveBeenCalled();
     });
   });
 });
